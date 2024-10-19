@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>three.js webgl - transform controls</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        /* Basic Reset */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #282c34; /* Dark background for contrast */
+            color: #ffffff; /* White text for better readability */
+            display: flex; /* Use flexbox for layout */
+            flex-direction: column; /* Stack elements vertically */
+            height: 100vh; /* Full height */
+        }
+
+        /* Controls Container */
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background-color: rgba(50, 50, 50, 0.8); /* Semi-transparent background */
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); /* Subtle shadow for depth */
+            max-width: 320px; /* Set max-width for control container */
+        }
+
+        /* Button and Input Styles */
+        button, input {
+            margin: 5px 0; /* Vertical spacing */
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s, transform 0.2s; /* Smooth background transition */
+            width: 100%; /* Full width buttons */
+        }
+
+        button {
+            background-color: #007bff; /* Primary button color */
+            color: white; /* White text on buttons */
+            cursor: pointer; /* Pointer cursor for buttons */
+        }
+
+        button:hover {
+            background-color: #0056b3; /* Darker shade on hover */
+            transform: scale(1.05); /* Slight scale on hover */
+        }
+
+        input {
+            background-color: #444; /* Input background color */
+            color: white; /* White text in input */
+            border: 1px solid #007bff; /* Border color */
+        }
+
+        input::placeholder {
+            color: #bbb; /* Light placeholder color */
+        }
+
+        input:focus {
+            outline: none; /* Remove outline */
+            border-color: #0056b3; /* Change border color on focus */
+        }
+
+        /* Info Display Styles */
+        #info {
+            position: absolute;
+            top: 150px; /* Adjusted for more spacing */
+            right: 10px; /* Align to the right */
+            color: white;
+            z-index: 100;
+            background-color: rgba(50, 50, 50, 0.8); /* Semi-transparent background */
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); /* Subtle shadow */
+            width: 300px; /* Fixed width for info box */
+        }
+
+        /* Matrix Display Styles */
+        .matrix-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .matrix-item {
+            background-color: #333;
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* Footer Styles */
+        footer {
+            margin-top: auto; /* Push footer to the bottom */
+            padding: 10px;
+            text-align: center;
+            background-color: rgba(50, 50, 50, 0.9); /* Dark background */
+            color: #ffffff; /* White text */
+            font-size: 14px; /* Slightly smaller text */
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h3>Transform Controls</h3>
+        <button id="translateBtn">Translate (W)</button>
+        <button id="rotateBtn">Rotate (E)</button>
+        <button id="scaleBtn">Scale (R)</button>
+        <button id="resetPositionBtn">Reset Position</button> <!-- Reset Position Button -->
+        
+        <h4>Set Position</h4>
+        <div>
+            <input type="number" id="xInput" placeholder="X" step="0.1">
+            <input type="number" id="yInput" placeholder="Y" step="0.1">
+            <input type="number" id="zInput" placeholder="Z" step="0.1">
+            <button id="setPositionBtn">Set Position</button>
+        </div>
+    </div>
+
+    <div id="info">
+        <div id="position"></div>
+        <div id="cameraMatrix"></div>
+        <div id="rotationMatrix"></div> <!-- New div for rotation matrix -->
+    </div>
+
+    <footer>
+        Realized by Tounekti Mohamed, Student in MSDHT
+    </footer>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./build/three.module.js",
+                "three/examples/jsm/controls/OrbitControls.js": "./OrbitControls.js",
+                "three/examples/jsm/controls/TransformControls.js": "./TransformControls.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+        import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+
+        let cameraPersp, currentCamera;
+        let scene, renderer, control, orbit;
+        const mesh = createMesh();
+
+        init();
+        render();
+
+        function init() {
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const aspect = window.innerWidth / window.innerHeight;
+            cameraPersp = new THREE.PerspectiveCamera(50, aspect, 0.1, 100);
+            currentCamera = cameraPersp;
+            currentCamera.position.set(5, 2.5, 5);
+
+            scene = new THREE.Scene();
+            scene.add(new THREE.GridHelper(5, 10, 0x888888, 0x444444));
+
+            const ambientLight = new THREE.AmbientLight(0xffffff);
+            scene.add(ambientLight);
+
+            const light = new THREE.DirectionalLight(0xffffff, 4);
+            light.position.set(1, 1, 1);
+            scene.add(light);
+
+            orbit = new OrbitControls(currentCamera, renderer.domElement);
+            orbit.update();
+            orbit.addEventListener('change', render);
+
+            control = new TransformControls(currentCamera, renderer.domElement);
+            control.addEventListener('change', render);
+            control.addEventListener('dragging-changed', function (event) {
+                orbit.enabled = !event.value;
+            });
+
+            scene.add(mesh);
+            control.attach(mesh);
+            scene.add(control.getHelper());
+
+            // Add button event listeners
+            document.getElementById('translateBtn').addEventListener('click', () => {
+                control.setMode('translate');
+            });
+
+            document.getElementById('rotateBtn').addEventListener('click', () => {
+                control.setMode('rotate');
+            });
+
+            document.getElementById('scaleBtn').addEventListener('click', () => {
+                control.setMode('scale');
+            });
+
+            // Reset position button listener
+            document.getElementById('resetPositionBtn').addEventListener('click', resetPosition);
+
+            // Set position button listener
+            document.getElementById('setPositionBtn').addEventListener('click', setPosition);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMesh() {
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshLambertMaterial({ map: new THREE.TextureLoader().load('textures/crate.gif') });
+            return new THREE.Mesh(geometry, material);
+        }
+
+        function resetPosition() {
+            mesh.position.set(0, 0, 0); // Reset position to (0,0,0)
+            render();
+        }
+
+        function setPosition() {
+            const x = parseFloat(document.getElementById('xInput').value) || 0;
+            const y = parseFloat(document.getElementById('yInput').value) || 0;
+            const z = parseFloat(document.getElementById('zInput').value) || 0;
+            mesh.position.set(x, y, z); // Set position from input values
+            render();
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            currentCamera.aspect = aspect;
+            currentCamera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+        function render() {
+            renderer.render(scene, currentCamera);
+            updatePositionDisplay();
+            updateCameraMatrixDisplay(); // Update camera matrix
+            updateRotationMatrixDisplay(); // Update rotation matrix
+        }
+
+        function updatePositionDisplay() {
+            const positionDiv = document.getElementById('position');
+            positionDiv.innerText = `Position: (${mesh.position.x.toFixed(2)}, ${mesh.position.y.toFixed(2)}, ${mesh.position.z.toFixed(2)})`;
+        }
+
+        function updateCameraMatrixDisplay() {
+            const cameraMatrix = new THREE.Matrix4();
+            cameraMatrix.copy(currentCamera.matrixWorldInverse); // Use inverse of world matrix
+            const matrixElements = cameraMatrix.elements;
+            const matrixContainer = document.createElement('div');
+            matrixContainer.className = 'matrix-container';
+
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const matrixItem = document.createElement('div');
+                    matrixItem.className = 'matrix-item';
+                    matrixItem.innerText = matrixElements[i * 4 + j].toFixed(4); // Round to 4 decimal places
+                    matrixContainer.appendChild(matrixItem);
+                }
+            }
+
+            const cameraMatrixDiv = document.getElementById('cameraMatrix');
+            cameraMatrixDiv.innerHTML = '<h4>Camera Matrix</h4>'; // Add a title
+            cameraMatrixDiv.appendChild(matrixContainer);
+        }
+
+        function updateRotationMatrixDisplay() {
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromQuaternion(mesh.quaternion); // Create a rotation matrix from the mesh's quaternion
+            const matrixElements = rotationMatrix.elements;
+            const matrixContainer = document.createElement('div');
+            matrixContainer.className = 'matrix-container';
+
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const matrixItem = document.createElement('div');
+                    matrixItem.className = 'matrix-item';
+                    matrixItem.innerText = matrixElements[i * 4 + j].toFixed(4); // Round to 4 decimal places
+                    matrixContainer.appendChild(matrixItem);
+                }
+            }
+
+            const rotationMatrixDiv = document.getElementById('rotationMatrix');
+            rotationMatrixDiv.innerHTML = '<h4>Rotation Matrix</h4>'; // Add a title
+            rotationMatrixDiv.appendChild(matrixContainer);
+        }
+    </script>
+</body>
+</html>
